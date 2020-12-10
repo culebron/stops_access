@@ -1,0 +1,50 @@
+version: '3.6'
+
+services:
+  calc:
+    volumes:
+      - ./osm:/osm
+      - ./scripts:/scripts
+    entrypoint: tail -f /dev/null
+    build: calc
+    image: transit-access-calc
+    network_mode: bridge
+
+  crop:
+    volumes:
+      - ./osm:/osm
+      - ./scripts:/scripts
+    build: calc
+    image: transit-access-calc
+    entrypoint: /scripts/crop.sh ${SOURCE:-osm/source.osm.pbf} ${CROP:-osm/area.geojson} ${TARGET:-osm/data.osm.pbf}
+
+  build:
+    image: osrm/osrm-backend:v5.22.0
+    volumes:
+      - ./osm:/osm
+      - ./scripts:/scripts
+    entrypoint: /scripts/build.sh ${OSM:-osm/data.osm.pbf} ${PROFILE:-osm/foot.lua}
+    # entrypoint: tail -f /dev/null 
+
+  backend:
+    image: osrm/osrm-backend:v5.22.0
+    volumes:
+      - ./osm:/osm
+      - ./scripts:/scripts
+    ports:
+      - ${BACK_PORT:-5000}:5000
+    network_mode: bridge
+    entrypoint: /scripts/backend.sh ${OSM:-osm/data.osm.pbf} ${THREADS:-8}
+    environment:
+      DISABLE_ACCESS_LOGGING: 1
+      
+  frontend:
+    image: osrm/osrm-frontend:latest
+    restart: always
+    network_mode: bridge
+    ports:
+      - ${FRONT_PORT:-9966}:9966
+    environment:
+      OSRM_BACKEND: http://${HOST:-localhost:5000}
+      OSRM_CENTER: ${CENTER:-55.0,83.0}
+      OSRM_ZOOM: 10
