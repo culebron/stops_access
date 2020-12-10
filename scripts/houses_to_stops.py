@@ -29,6 +29,17 @@ def read_dataframe(input_path):
 	return df.to_crs(SIB)  # albers siberia projection for entire russia
 
 
+def write_dataframe(df, output_path):
+	df.to_file(output_path, driver='GPKG')
+
+
+def get_local_houses(stops_df, houses_df, dist):
+	houses_match = gpd.sjoin(gpd.GeoDataFrame({'geometry': [stops_df['geometry'].values[0].buffer(dist, resolution=5)]}, crs=SIB), houses_df)
+	houses_local = houses_df[houses_df.index.isin(houses_match.index_right)]
+	houses_dict = dict(enumerate(houses_local.index))
+	return houses_local, houses_dict
+
+
 @argh.dispatch_command
 def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 500):
 	with ExitStack() as stack, tqdm(desc='Routing from stops') as tt:
@@ -45,11 +56,11 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 		# make circes around stops (lower number), and glue together
 		# the .geoms object is polygons that stuck together
 		partitions = gpd.GeoDataFrame({
-			'geometry': stops_df.geometry.buffer(max_dist / 2, resolution=4).unary_union.geoms},
+			'geometry': stops_df.geometry.buffer(max_dist / 3, resolution=4).unary_union.geoms},
 			crs=SIB)
 
 		if DEBUG:
-			partitions.to_file('/tmp/partitions.gpkg', driver='GPKG')
+			write_dataframe(partitions, '/tmp/partitions.gpkg')
 
 		# match stops and houses to partitions
 		# gpd.sjoin is much faster than filtering a gdf by geometry
@@ -63,20 +74,22 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 		for partition_id, stops_group in stops_match.groupby(stops_match.index):
 			stops_local = stops_df[stops_df.index.isin(stops_group.index_right)]
 
-			houses_match = gpd.sjoin(gpd.GeoDataFrame({'geometry': [stops_group['geometry'].values[0].buffer(max_dist / 2)]}, crs=SIB), houses_df)
-			houses_local = houses_df[houses_df.index.isin(houses_match.index_right)]
+			houses_local, houses_dict = get_local_houses(stops_group, houses_df, max_dist / 2)
 
 			if len(houses_local) == 0:
 				tt.update(len(stops_local))
 				continue
-
-			houses_dict = dict(enumerate(houses_local.index))
 			
 			max_stops = int(MAX_TABLE_SIZE / len(houses_local))
 
 			for s in range(0, len(stops_local), max_stops):
 				stops_slice = stops_local[s:s + max_stops].copy()
 				stops_dict = dict(enumerate(stops_slice.index))
+				
+				houses_local, houses_dict = get_local_houses(stops_slice, houses_df, max_dist)
+				if len(houses_local) == 0:
+					tt.update(len(stops_slice))
+					continue
 				
 				# iterate over stops, make table requests
 				sources_coords = stops_slice.geometry.to_crs(WGS).to_list()
@@ -152,8 +165,8 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 					debug_dfs.append(results_df)
 
 		houses_df['min_distance'] = houses_df.index.map(global_mins.distance.to_dict()).fillna(np.inf)
-		houses_df.to_crs(WGS).to_file(output_houses, driver='GPKG')
+		write_dataframe(houses_df.to_crs(WGS), output_houses)
 
 		if DEBUG:
-			pd.concat(debug_dfs).to_file('/tmp/debug_lines.gpkg', driver='GPKG')
+			write_dataframe(pd.concat(debug_dfs), '/tmp/debug_lines.gpkg')
 			print(f'{request_count} http requests')
