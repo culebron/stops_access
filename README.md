@@ -38,7 +38,7 @@ By default the script `scripts/crop.sh` will take `osm/source.osm.pbf` file, cro
 
 (Both containers exit when their scripts finish.)
 
-*How to parametrize this:* if you want to have >1 areas, here are sample commands:
+**How to parametrize this:** if you want to have >1 areas, here are sample commands:
 
 Cropping from custom file, by custom area and to a custom OSM file:
 
@@ -63,7 +63,7 @@ This will run both containers and block the shell. You can exit them with Ctrl+C
 
 Open `http://localhost:9966` to see the frontend and test if routing is working.
 
-*Troubleshooting:*
+**Troubleshooting:**
 
 1. if routes aren't built in your area, check where OSRM projects the points (you may have cropped it in a wrong area)
 2. check if frontend points at localhost and appropriate port. Open developer tools in the browser and in Network tab, see where XHR requests go.
