@@ -5,6 +5,7 @@ from time import sleep
 from tqdm import tqdm
 import argh
 import geopandas as gpd
+import numpy as np
 import os
 import pandas as pd
 import pyproj
@@ -54,14 +55,14 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 		# gpd.sjoin is much faster than filtering a gdf by geometry
 		stops_match = gpd.sjoin(partitions, stops_df)
 
-		global_results = {}
+		global_mins = None
 		debug_dfs = []
+		request_count = 0
 
 		# walk throuh 
 		for partition_id, stops_group in stops_match.groupby(stops_match.index):
 			stops_local = stops_df[stops_df.index.isin(stops_group.index_right)]
 
-			#import ipdb; ipdb.set_trace()
 			houses_match = gpd.sjoin(gpd.GeoDataFrame({'geometry': [stops_group['geometry'].values[0].buffer(max_dist / 2)]}, crs=SIB), houses_df)
 			houses_local = houses_df[houses_df.index.isin(houses_match.index_right)]
 
@@ -69,7 +70,7 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 				tt.update(len(stops_local))
 				continue
 
-			houses_dict = dict(enumerate(houses_df.index))
+			houses_dict = dict(enumerate(houses_local.index))
 			
 			max_stops = int(MAX_TABLE_SIZE / len(houses_local))
 
@@ -100,6 +101,7 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 
 					try:
 						response = requests.get(encoded_url)
+						request_count += 1
 					except requests.exceptions.ConnectionError as er:
 						last_error = er
 						continue
@@ -132,8 +134,11 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 				results_df['stop'] = results_df.stop.map(stops_dict)
 				
 				# grouping by house (don't need stops)
-				house_result = results_df.groupby('house').agg({'distance': 'min'})
-				global_results.update(house_result.to_dict())
+				local_results = results_df.groupby('house').agg({'distance': 'min'})
+				if global_mins is None:
+					global_mins = local_results
+				else:
+					global_mins = pd.concat([global_mins, local_results]).groupby('house').agg({'distance': 'min'})
 
 				tt.update(len(stops_slice))
 
@@ -146,8 +151,9 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 					results_df = gpd.GeoDataFrame(results_df)
 					debug_dfs.append(results_df)
 
-		houses_df['min_distance'] = houses_df.index.map(global_results)
+		houses_df['min_distance'] = houses_df.index.map(global_mins.distance.to_dict()).fillna(np.inf)
 		houses_df.to_crs(WGS).to_file(output_houses, driver='GPKG')
 
 		if DEBUG:
 			pd.concat(debug_dfs).to_file('/tmp/debug_lines.gpkg', driver='GPKG')
+			print(f'{request_count} http requests')
