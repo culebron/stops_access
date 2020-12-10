@@ -5,6 +5,7 @@ services:
     volumes:
       - ./osm:/osm
       - ./scripts:/scripts
+      - ./tmp:/tmp
     entrypoint: tail -f /dev/null
     build: calc
     image: transit-access-calc
@@ -14,6 +15,7 @@ services:
     volumes:
       - ./osm:/osm
       - ./scripts:/scripts
+      - ./tmp:/tmp
     build: calc
     image: transit-access-calc
     entrypoint: sh /scripts/crop.sh ${SOURCE:-osm/source.osm.pbf} ${CROP:-osm/area.geojson} ${TARGET:-osm/data.osm.pbf}
@@ -36,7 +38,7 @@ services:
     network_mode: bridge
     entrypoint: sh /scripts/backend.sh ${OSM:-osm/data.osm.pbf} ${THREADS:-8}
     environment:
-      DISABLE_ACCESS_LOGGING: 1
+      DISABLE_ACCESS_LOGGING: ${NO_LOGS:-1}
       
   frontend:
     image: osrm/osrm-frontend:latest
