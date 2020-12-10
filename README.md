@@ -38,6 +38,21 @@ By default the script `scripts/crop.sh` will take `osm/source.osm.pbf` file, cro
 
 (Both containers exit when their scripts finish.)
 
+*How to parametrize this:* if you want to have >1 areas, here are sample commands:
+
+Cropping from custom file, by custom area and to a custom OSM file:
+
+    SOURCE=osm/my_other_file.osm.pbf AREA=osm/other_area.geojson OSM=osm/my_other_data.osm.pbf docker-compose up crop
+
+Building routers in two different areas:
+
+    OSM=osm/file_one.osm.pbf docker-compose up build
+    OSM=osm/file_two.osm.pbf docker-compose up build
+
+Running the router in one of them:
+
+    OSM=osm/file_two.osm.pbf docker-compose up backend
+
 ## Running a router
 
 Launch the routing backend with a frontend by a command:

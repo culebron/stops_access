@@ -18,7 +18,7 @@ services:
       - ./tmp:/tmp
     build: calc
     image: transit-access-calc
-    entrypoint: sh /scripts/crop.sh ${SOURCE:-osm/source.osm.pbf} ${CROP:-osm/area.geojson} ${TARGET:-osm/data.osm.pbf}
+    entrypoint: sh /scripts/crop.sh ${SOURCE:-osm/source.osm.pbf} ${CROP:-osm/area.geojson} ${OSM:-osm/data.osm.pbf}
 
   build:
     image: osrm/osrm-backend:v5.22.0
