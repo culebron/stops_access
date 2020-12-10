@@ -5,7 +5,6 @@ from time import sleep
 from tqdm import tqdm
 import argh
 import geopandas as gpd
-import numpy as np
 import os
 import pandas as pd
 import pyproj
@@ -134,7 +133,7 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 				
 				# grouping by house (don't need stops)
 				house_result = results_df.groupby('house').agg({'distance': 'min'})
-				global_results.update(house_result)
+				global_results.update(house_result.to_dict())
 
 				tt.update(len(stops_slice))
 
@@ -148,7 +147,7 @@ def main(houses_file, stops_file, router_url, output_houses, max_dist: float = 5
 					debug_dfs.append(results_df)
 
 		houses_df['min_distance'] = houses_df.index.map(global_results)
-		houses_df.to_file(output_houses, driver='GPKG')
+		houses_df.to_crs(WGS).to_file(output_houses, driver='GPKG')
 
 		if DEBUG:
 			pd.concat(debug_dfs).to_file('/tmp/debug_lines.gpkg', driver='GPKG')
